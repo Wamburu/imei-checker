@@ -1,9 +1,5 @@
 [phases.setup]
-cmds = [
-    "apt-get update",
-    "apt-get install -y --no-install-recommends chromium",
-    "npm install"
-]
+cmds = ["npm install"]
 
 [phases.build]
 cmds = ["echo 'Build complete'"]
@@ -13,4 +9,3 @@ cmd = "npm start"
 
 [environment]
 NODE_ENV = "production"
-PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
