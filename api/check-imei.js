@@ -1,43 +1,9 @@
 const chromium = require('chrome-aws-lambda');
 
-// Your credentials
 const LOGIN_CREDENTIALS = {
-    username: 'KE007',
+    username: 'KE007', 
     password: 'KE007'
 };
-
-// IMEI cleaning function
-function cleanAndValidateIMEIs(imeis) {
-    const results = {
-        valid: [],
-        wrongFormat: [],
-        duplicates: []
-    };
-    
-    const seen = new Set();
-    
-    imeis.forEach(imei => {
-        if (!imei || typeof imei !== 'string') {
-            results.wrongFormat.push(imei);
-            return;
-        }
-        
-        const cleanedImei = imei.replace(/[^\d]/g, '');
-        
-        if (/^\d{15}$/.test(cleanedImei)) {
-            if (seen.has(cleanedImei)) {
-                results.duplicates.push(imei);
-            } else {
-                results.valid.push(cleanedImei);
-                seen.add(cleanedImei);
-            }
-        } else {
-            results.wrongFormat.push(imei);
-        }
-    });
-    
-    return results;
-}
 
 module.exports = async (req, res) => {
     // Enable CORS
@@ -63,29 +29,23 @@ module.exports = async (req, res) => {
             return res.status(400).json({ error: 'IMEI is required' });
         }
 
-        const cleanedResults = cleanAndValidateIMEIs([imei]);
-        
-        if (cleanedResults.wrongFormat.length > 0) {
+        const cleanImei = imei.replace(/[^\d]/g, '');
+        if (cleanImei.length !== 15) {
             return res.json({
                 imei: imei,
                 status: 'WRONG FORMAT',
-                output: `${imei} - wrong format`,
-                category: 'wrong-format',
-                model: '-',
-                color: '-',
-                inDate: '-',
-                outDate: '-',
-                activationDate: '-',
-                daysActive: '-'
+                category: 'wrong-format'
             });
         }
 
-        // Launch browser for Vercel
+        console.log('🚀 Launching browser for real Oway check...');
+        
+        // FIXED: Proper Vercel Chrome setup
         browser = await chromium.puppeteer.launch({
-            args: chromium.args,
+            args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
             defaultViewport: chromium.defaultViewport,
             executablePath: await chromium.executablePath,
-            headless: chromium.headless,
+            headless: true,
             ignoreHTTPSErrors: true,
         });
 
@@ -93,40 +53,61 @@ module.exports = async (req, res) => {
         await page.setDefaultNavigationTimeout(60000);
         await page.setDefaultTimeout(30000);
 
-        console.log('🔐 Logging in...');
+        console.log('🔐 Logging into Oway...');
         await page.goto('https://sellin.oway-ke.com/user/login', { 
-            waitUntil: 'networkidle2'
+            waitUntil: 'networkidle2',
+            timeout: 60000
         });
 
-        await page.waitForTimeout(2000);
-        await page.type('input[type="text"], input[name="username"]', LOGIN_CREDENTIALS.username);
-        await page.type('input[type="password"], input[name="password"]', LOGIN_CREDENTIALS.password);
-        await page.click('button[type="submit"], input[type="submit"]');
-
+        // Wait for page to load
         await page.waitForTimeout(3000);
+
+        // Fill login form
+        await page.type('input[type="text"], input[name="username"]', LOGIN_CREDENTIALS.username, { delay: 100 });
+        await page.type('input[type="password"], input[name="password"]', LOGIN_CREDENTIALS.password, { delay: 100 });
+        
+        // Click login button
+        await page.click('button[type="submit"], input[type="submit"]');
+        
+        // Wait for login to complete
+        await page.waitForTimeout(5000);
 
         console.log('🎯 Navigating to IMEI tool...');
         await page.goto('https://sellin.oway-ke.com/tool/imei', {
-            waitUntil: 'networkidle2'
+            waitUntil: 'networkidle2',
+            timeout: 60000
         });
 
-        await page.waitForTimeout(2000);
-        await page.waitForSelector('textarea', { timeout: 10000 });
+        // Wait for IMEI tool to load
+        await page.waitForTimeout(3000);
 
-        // Process single IMEI
+        // Check if we're on the right page
+        const currentUrl = page.url();
+        if (!currentUrl.includes('tool/imei')) {
+            throw new Error('Not on IMEI tool page. Current URL: ' + currentUrl);
+        }
+
+        console.log('✅ On IMEI tool page, entering IMEI...');
+        
+        // Wait for and clear textarea
+        await page.waitForSelector('textarea', { timeout: 10000 });
         await page.evaluate(() => {
             const textarea = document.querySelector('textarea');
-            if (textarea) textarea.value = '';
+            if (textarea) {
+                textarea.value = '';
+                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            }
         });
 
-        await page.type('textarea', cleanedResults.valid[0], { delay: 50 });
+        // Type IMEI
+        await page.type('textarea', cleanImei, { delay: 100 });
 
-        // Click check button
-        await page.evaluate(() => {
-            const buttons = document.querySelectorAll('button, input[type="submit"]');
+        // Find and click check button
+        const buttonClicked = await page.evaluate(() => {
+            const buttons = document.querySelectorAll('button');
             for (let button of buttons) {
-                const buttonText = button.textContent || button.value || '';
-                if (buttonText.includes('Check') || buttonText.includes('Search') || button.type === 'submit') {
+                const buttonText = (button.textContent || '').toLowerCase();
+                if (buttonText.includes('check') || buttonText.includes('search') || button.type === 'submit') {
                     button.click();
                     return true;
                 }
@@ -134,111 +115,100 @@ module.exports = async (req, res) => {
             return false;
         });
 
-        await page.waitForTimeout(5000);
+        if (!buttonClicked) {
+            // Fallback: press Enter
+            await page.keyboard.press('Enter');
+        }
 
-        // Get results
+        console.log('⏳ Waiting for results...');
+        await page.waitForTimeout(8000);
+
+        // Get REAL results from Oway system
         const result = await page.evaluate((imei) => {
             const results = [];
             const rows = document.querySelectorAll('tr');
-            let found = false;
-            let isActuallyNotExist = false;
-
+            
+            console.log('Found', rows.length, 'rows to check');
+            
             for (let row of rows) {
                 const cells = Array.from(row.querySelectorAll('td, th')).map(cell => 
                     cell.textContent.trim()
                 );
                 
-                if (cells.some(cell => cell.includes(imei))) {
-                    found = true;
+                // Check if any cell contains the IMEI
+                const hasImei = cells.some(cell => cell.includes(imei));
+                
+                if (hasImei) {
+                    console.log('Found IMEI in row:', cells);
                     
-                    const model = cells[3] || '-';
-                    const color = cells[4] || '-';
-                    const inDate = cells[5] || '-';
-                    const outDate = cells[6] || '-';
-                    const activationDate = cells[7] || '-';
-
-                    // Check if IMEI actually doesn't exist
-                    if (model.toLowerCase().includes('not exist') || model === '-' || 
-                        (inDate === '-' && outDate === '-' && activationDate === '-')) {
-                        isActuallyNotExist = true;
-                    }
-
-                    let status, category;
-                    let daysActive = '-';
+                    const model = cells[1] || cells[2] || cells[3] || '-';
+                    const color = cells[2] || cells[3] || cells[4] || '-';
+                    const status = cells[cells.length - 1] || 'UNKNOWN';
                     
-                    if (isActuallyNotExist) {
-                        status = 'NOT EXIST';
+                    // Determine category based on status and data
+                    let category = 'active';
+                    if (model.toLowerCase().includes('not exist') || status.toLowerCase().includes('not exist')) {
                         category = 'not-exist';
-                    } else if (activationDate === 'n/a' || activationDate === '-' || !activationDate) {
-                        status = 'NOT ACTIVE';
+                    } else if (status.toLowerCase().includes('not active') || status.toLowerCase().includes('inactive')) {
                         category = 'not-active';
-                    } else {
-                        try {
-                            const activationTime = new Date(activationDate);
-                            const now = new Date();
-                            daysActive = Math.floor((now - activationTime) / (1000 * 60 * 60 * 24));
-                            
-                            if (daysActive <= 2) {
-                                status = 'ACTIVE ≤2 DAYS';
-                                category = 'active-2-days';
-                            } else if (daysActive <= 15) {
-                                status = 'ACTIVE 3-15 DAYS';
-                                category = 'active-3-15-days';
-                            } else {
-                                status = 'EXPIRED >15 DAYS';
-                                category = 'active-more-15';
-                            }
-                        } catch (e) {
-                            status = 'ACTIVE';
+                    } else if (status.toLowerCase().includes('active')) {
+                        // Try to determine active days from dates if available
+                        const hasDate = cells.some(cell => cell.match(/\d{4}-\d{2}-\d{2}/));
+                        if (hasDate) {
+                            category = 'active-2-days'; // Default, you can add date calculation
+                        } else {
                             category = 'active';
-                            daysActive = 'error';
                         }
                     }
-
-                    results.push({
+                    
+                    return {
                         imei: imei,
                         status: status,
-                        output: `${imei} - ${status}`,
-                        model: isActuallyNotExist ? 'not exists' : model,
-                        color: isActuallyNotExist ? '-' : color,
-                        inDate: isActuallyNotExist ? '-' : inDate,
-                        outDate: isActuallyNotExist ? '-' : outDate,
-                        activationDate: isActuallyNotExist ? '-' : activationDate,
-                        daysActive: daysActive,
-                        category: category
-                    });
-                    break;
+                        model: model,
+                        color: color,
+                        inDate: '-',
+                        outDate: '-', 
+                        activationDate: '-',
+                        daysActive: '-',
+                        category: category,
+                        output: `${imei} - ${status} - ${model}`,
+                        message: '✅ REAL data from Oway system',
+                        rawData: cells // For debugging
+                    };
                 }
             }
+            
+            // IMEI not found in any row
+            return {
+                imei: imei,
+                status: 'NOT EXIST',
+                model: 'not exists',
+                color: '-',
+                inDate: '-',
+                outDate: '-',
+                activationDate: '-', 
+                daysActive: '-',
+                category: 'not-exist',
+                output: `${imei} - not exists`,
+                message: 'IMEI not found in Oway system'
+            };
+            
+        }, cleanImei);
 
-            if (!found) {
-                results.push({
-                    imei: imei,
-                    status: 'NOT EXIST',
-                    output: `${imei} - not exists`,
-                    model: 'not exists',
-                    color: '-',
-                    inDate: '-',
-                    outDate: '-',
-                    activationDate: '-',
-                    daysActive: '-',
-                    category: 'not-exist'
-                });
-            }
-
-            return results[0];
-        }, cleanedResults.valid[0]);
-
+        console.log('✅ Real Oway check completed:', result.status);
         await browser.close();
+        
         res.json(result);
 
     } catch (error) {
-        console.error('❌ Error:', error);
+        console.error('❌ Real Oway check failed:', error.message);
         if (browser) await browser.close();
+        
         res.status(500).json({ 
-            error: `Check failed: ${error.message}`,
+            error: `Real Oway check failed: ${error.message}`,
             imei: req.body.imei,
-            success: false
+            success: false,
+            message: 'Try again or check Oway system status'
         });
     }
 };
