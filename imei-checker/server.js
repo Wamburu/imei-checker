@@ -1,13 +1,12 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
-const axios = require('axios'); // We'll use this instead of Puppeteer
 
 const app = express();
 app.use(bodyParser.json());
 app.use(express.static('public'));
 
-// Remove ALL Puppeteer code and use simple API
+// Simple IMEI check endpoint
 app.post('/api/check-imei', async (req, res) => {
     const { imei } = req.body;
 
@@ -15,7 +14,6 @@ app.post('/api/check-imei', async (req, res) => {
         return res.status(400).json({ error: 'IMEI is required' });
     }
 
-    // Clean IMEI
     const cleanImei = imei.replace(/[^\d]/g, '');
     if (cleanImei.length !== 15) {
         return res.json({
@@ -27,24 +25,21 @@ app.post('/api/check-imei', async (req, res) => {
     }
 
     try {
-        // SIMULATE IMEI check (replace this with actual API calls if available)
-        // For now, we'll return mock data to test the mobile interface
-        const mockResults = [
-            { status: 'ACTIVE', days: 5, model: 'Samsung Galaxy S23' },
-            { status: 'NOT_ACTIVE', days: 0, model: 'iPhone 15' },
-            { status: 'NOT_EXIST', days: null, model: null }
-        ];
-        
-        const randomResult = mockResults[Math.floor(Math.random() * mockResults.length)];
+        // Mock response for testing (replace with real logic later)
+        const statuses = ['ACTIVE', 'NOT ACTIVE', 'NOT EXIST'];
+        const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
         
         res.json({
             imei: cleanImei,
-            status: randomResult.status,
-            model: randomResult.model,
-            daysActive: randomResult.days,
-            output: `${cleanImei} - ${randomResult.status}`,
-            category: randomResult.status.toLowerCase().replace('_', '-'),
-            timestamp: new Date().toISOString()
+            status: randomStatus,
+            model: `Device ${Math.floor(Math.random() * 1000)}`,
+            color: 'Black',
+            inDate: '2024-01-15',
+            outDate: 'n/a',
+            activationDate: randomStatus === 'ACTIVE' ? '2024-01-20' : 'n/a',
+            daysActive: randomStatus === 'ACTIVE' ? Math.floor(Math.random() * 30) : 0,
+            output: `${cleanImei} - ${randomStatus}`,
+            category: randomStatus.toLowerCase().replace(' ', '-')
         });
 
     } catch (error) {
@@ -57,7 +52,7 @@ app.post('/api/check-imei', async (req, res) => {
     }
 });
 
-// Batch check (simplified)
+// Batch check endpoint
 app.post('/api/check-batch-imei', async (req, res) => {
     const { imeis } = req.body;
 
@@ -68,30 +63,26 @@ app.post('/api/check-batch-imei', async (req, res) => {
     const validImeis = imeis
         .map(imei => imei.replace(/[^\d]/g, ''))
         .filter(imei => imei.length === 15)
-        .slice(0, 10); // Limit to 10 for mobile
+        .slice(0, 10);
 
     const results = [];
 
     for (const imei of validImeis) {
-        try {
-            // Use single check logic for each IMEI
-            const mockReq = { body: { imei } };
-            const mockResult = {
-                imei: imei,
-                status: Math.random() > 0.3 ? 'ACTIVE' : 'NOT_ACTIVE',
-                model: `Device ${Math.floor(Math.random() * 1000)}`,
-                daysActive: Math.floor(Math.random() * 30),
-                category: Math.random() > 0.3 ? 'active' : 'not-active'
-            };
-            results.push(mockResult);
-        } catch (error) {
-            results.push({
-                imei: imei,
-                status: 'ERROR',
-                output: `Failed: ${error.message}`,
-                category: 'error'
-            });
-        }
+        const statuses = ['ACTIVE', 'NOT ACTIVE', 'NOT EXIST'];
+        const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+        
+        results.push({
+            imei: imei,
+            status: randomStatus,
+            model: `Device ${Math.floor(Math.random() * 1000)}`,
+            color: 'Black',
+            inDate: '2024-01-15',
+            outDate: 'n/a',
+            activationDate: randomStatus === 'ACTIVE' ? '2024-01-20' : 'n/a',
+            daysActive: randomStatus === 'ACTIVE' ? Math.floor(Math.random() * 30) : 0,
+            output: `${imei} - ${randomStatus}`,
+            category: randomStatus.toLowerCase().replace(' ', '-')
+        });
     }
 
     res.json({
@@ -100,8 +91,8 @@ app.post('/api/check-batch-imei', async (req, res) => {
         results: results,
         summary: {
             active: results.filter(r => r.status === 'ACTIVE').length,
-            'not-active': results.filter(r => r.status === 'NOT_ACTIVE').length,
-            error: results.filter(r => r.status === 'ERROR').length
+            'not-active': results.filter(r => r.status === 'NOT ACTIVE').length,
+            'not-exist': results.filter(r => r.status === 'NOT EXIST').length
         }
     });
 });
@@ -111,7 +102,7 @@ app.get('/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         mobile: true,
-        puppeteer: false,
+        vercel: true,
         timestamp: new Date().toISOString()
     });
 });
@@ -121,8 +112,6 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`📱 LIGHT IMEI Checker running on port ${PORT}`);
-    console.log(`⚡ No Puppeteer - Fast deployment`);
-    console.log(`🌐 Access via: http://localhost:${PORT}`);
+app.listen(PORT, () => {
+    console.log(`📱 IMEI Checker running on Vercel - Port ${PORT}`);
 });
