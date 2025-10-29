@@ -79,37 +79,31 @@ async function initializeBrowser() {
     console.log('🚀 Starting browser...');
     
     try {
-        // RAILWAY-OPTIMIZED PUPPETEER CONFIGURATION
+        // LIGHTWEIGHT PUPPETEER CONFIGURATION FOR RAILWAY
         const browser = await puppeteer.launch({
             headless: 'new',
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--disable-gpu',
                 '--single-process',
-                '--no-zygote',
-                '--disable-accelerated-2d-canvas',
-                '--disable-web-security',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding'
+                '--no-zygote'
             ],
-            timeout: 60000
+            timeout: 30000
         });
 
         const page = await browser.newPage();
         
-        await page.setDefaultNavigationTimeout(60000);
-        await page.setDefaultTimeout(30000);
+        await page.setDefaultNavigationTimeout(30000);
+        await page.setDefaultTimeout(15000);
 
         console.log('📝 Going directly to login page...');
         await page.goto('https://sellin.oway-ke.com/user/login', { 
-            waitUntil: 'networkidle2',
-            timeout: 60000
+            waitUntil: 'domcontentloaded',
+            timeout: 30000
         });
 
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(2000);
 
         console.log('🔐 Attempting login...');
         await page.type('input[type="text"], input[name="username"]', LOGIN_CREDENTIALS.username, { delay: 50 });
@@ -119,12 +113,12 @@ async function initializeBrowser() {
         await page.click('button[type="submit"], input[type="submit"]');
 
         console.log('⏳ Waiting for login...');
-        await page.waitForTimeout(5000);
+        await page.waitForTimeout(3000);
 
         console.log('🎯 Navigating to IMEI tool...');
         await page.goto('https://sellin.oway-ke.com/tool/imei', {
-            waitUntil: 'networkidle2',
-            timeout: 60000
+            waitUntil: 'domcontentloaded',
+            timeout: 30000
         });
 
         const currentUrl = page.url();
@@ -138,8 +132,8 @@ async function initializeBrowser() {
             console.log('⚠️ On different page, trying to navigate to IMEI tool again...');
             try {
                 await page.goto('https://sellin.oway-ke.com/tool/imei', {
-                    waitUntil: 'networkidle2',
-                    timeout: 30000
+                    waitUntil: 'domcontentloaded',
+                    timeout: 15000
                 });
             } catch (navError) {
                 console.log('❌ Could not navigate to IMEI tool directly');
@@ -147,10 +141,10 @@ async function initializeBrowser() {
             }
         }
 
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(2000);
         
         try {
-            await page.waitForSelector('textarea', { timeout: 10000 });
+            await page.waitForSelector('textarea', { timeout: 5000 });
             console.log('✅ IMEI tool is ready for use!');
         } catch (error) {
             console.log('❌ IMEI tool not loading properly');
@@ -179,14 +173,14 @@ async function processIMEIChunk(imeiChunk, page) {
         const currentUrl = page.url();
         if (!currentUrl.includes('tool/imei')) {
             await page.goto('https://sellin.oway-ke.com/tool/imei', {
-                waitUntil: 'networkidle2',
-                timeout: 30000
+                waitUntil: 'domcontentloaded',
+                timeout: 15000
             });
-            await page.waitForTimeout(2000);
+            await page.waitForTimeout(1000);
         }
 
         // Clear textarea
-        await page.waitForSelector('textarea', { timeout: 10000 });
+        await page.waitForSelector('textarea', { timeout: 5000 });
         await page.evaluate(() => {
             const textarea = document.querySelector('textarea');
             if (textarea) {
@@ -197,7 +191,7 @@ async function processIMEIChunk(imeiChunk, page) {
 
         // Type IMEIs for this chunk
         const bulkImeiText = imeiChunk.join('\n');
-        await page.type('textarea', bulkImeiText, { delay: 20 });
+        await page.type('textarea', bulkImeiText, { delay: 10 });
 
         // Click check button
         const buttonClicked = await page.evaluate(() => {
@@ -217,7 +211,7 @@ async function processIMEIChunk(imeiChunk, page) {
         }
 
         // Wait for results
-        await page.waitForTimeout(8000);
+        await page.waitForTimeout(5000);
 
         // PARSING LOGIC WITH SUB-CATEGORIES
         const results = await page.evaluate((imeis) => {
@@ -362,7 +356,7 @@ async function checkBulkIMEIs(imeiList, page) {
             // Small delay between chunks to avoid overwhelming the website
             if (i < chunks.length - 1) {
                 console.log('⏳ Waiting before next chunk...');
-                await page.waitForTimeout(2000);
+                await page.waitForTimeout(1000);
             }
         } catch (error) {
             console.error(`❌ Error processing chunk ${i + 1}:`, error.message);
@@ -428,7 +422,7 @@ app.post('/api/check-imei', async (req, res) => {
     }
 });
 
-// Batch IMEI check endpoint - UPDATED WITH SUB-CATEGORIES
+// Batch IMEI check endpoint
 app.post('/api/check-batch-imei', async (req, res) => {
     const { imeis } = req.body;
 
@@ -447,12 +441,6 @@ app.post('/api/check-batch-imei', async (req, res) => {
     }
 
     console.log(`🔄 Starting batch check of ${validImeis.length} IMEIs (will process in chunks of 50)...`);
-    if (wrongFormatImeis.length > 0) {
-        console.log(`⚠️  ${wrongFormatImeis.length} IMEIs in wrong format`);
-    }
-    if (duplicateImeis.length > 0) {
-        console.log(`⚠️  ${duplicateImeis.length} duplicate IMEIs found`);
-    }
 
     const startTime = Date.now();
 
@@ -497,9 +485,7 @@ app.post('/api/check-batch-imei', async (req, res) => {
         const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
         
         console.log(`✅ Batch check completed in ${totalTime} seconds`);
-        console.log(`📊 Processed ${allResults.length} total IMEIs`);
 
-        // UPDATED SUMMARY WITH SUB-CATEGORIES
         const summary = {
             'not-exist': allResults.filter(r => r.category === 'not-exist').length,
             'not-active': allResults.filter(r => r.category === 'not-active').length,
@@ -511,22 +497,12 @@ app.post('/api/check-batch-imei', async (req, res) => {
             'duplicate': duplicateImeis.length
         };
 
-        // Log categorization breakdown
-        console.log('📈 Categorization Breakdown:');
-        console.log(`   🟢 Active ≤2 days: ${summary['active-2-days']}`);
-        console.log(`   🟡 Active 3-15 days: ${summary['active-3-15-days']}`);
-        console.log(`   🔴 Expired >15 days: ${summary['active-more-15']}`);
-        console.log(`   ⚫ Not Active: ${summary['not-active']}`);
-        console.log(`   ❌ Not Exist: ${summary['not-exist']}`);
-        console.log(`   ⚠️ Errors: ${summary['error']}`);
-
         res.json({
             success: true,
             total: imeis.length,
             valid: validImeis.length,
             wrongFormat: wrongFormatImeis.length,
             duplicates: duplicateImeis.length,
-            chunks: Math.ceil(validImeis.length / 50),
             summary: summary,
             results: allResults,
             processingTime: `${totalTime} seconds`
@@ -555,50 +531,21 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Debug endpoint to check current page
-app.get('/debug-page', async (req, res) => {
-    try {
-        if (!browserInstance) {
-            return res.json({ error: 'No browser instance' });
-        }
-        const page = (await browserInstance.pages())[0];
-        const url = page.url();
-        const title = await page.title();
-        res.json({
-            url: url,
-            title: title,
-            onImeiTool: url.includes('tool/imei')
-        });
-    } catch (error) {
-        res.json({ error: error.message });
-    }
-});
-
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// RAILWAY-OPTIMIZED PORT CONFIGURATION
+// RAILWAY PORT CONFIGURATION
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log('📱 IMEI Checker with enhanced categorization');
-    console.log('🔧 Debug: /debug-page');
+    console.log('📱 IMEI Checker - Lightweight Railway Version');
     console.log('❤️ Health: /health');
-    console.log('🌐 Environment:', process.env.NODE_ENV || 'development');
 });
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
     console.log('🛑 Shutting down...');
-    if (browserInstance) {
-        await browserInstance.close();
-    }
-    process.exit();
-});
-
-process.on('SIGTERM', async () => {
-    console.log('🛑 Received SIGTERM, shutting down...');
     if (browserInstance) {
         await browserInstance.close();
     }
