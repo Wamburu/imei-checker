@@ -79,15 +79,24 @@ async function initializeBrowser() {
     console.log('🚀 Starting browser...');
     
     try {
+        // RAILWAY-COMPATIBLE PUPPETEER CONFIGURATION
         const browser = await puppeteer.launch({
             headless: true,
             args: [
-                '--no-sandbox', 
+                '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-gpu',
-                '--disable-extensions'
+                '--single-process',
+                '--no-zygote',
+                '--disable-setuid-sandbox',
+                '--disable-accelerated-2d-canvas',
+                '--disable-web-security',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding'
             ],
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
             timeout: 60000
         });
 
