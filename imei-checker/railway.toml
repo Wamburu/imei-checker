@@ -2,8 +2,11 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "node server.js"
+startCommand = "npm start"
 
-[[services]]
-name = "web"
-httpPort = 3001
+[build.environment]
+NODE_ENV = "production"
+
+[[build.environment]]
+name = "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD"
+value = "false"
