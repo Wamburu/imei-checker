@@ -32,12 +32,9 @@ function cleanAndValidateIMEIs(imeis) {
             return;
         }
         
-        // Clean the IMEI - remove spaces, dashes, and other non-digit characters
         const cleanedImei = imei.replace(/[^\d]/g, '');
         
-        // Check if it's exactly 15 digits and only numbers
         if (/^\d{15}$/.test(cleanedImei)) {
-            // Check for duplicates
             if (seen.has(cleanedImei)) {
                 results.duplicates.push(imei);
             } else {
@@ -52,7 +49,7 @@ function cleanAndValidateIMEIs(imeis) {
     return results;
 }
 
-// Initialize browser with direct navigation to IMEI tool
+// Initialize browser
 async function initializeBrowser() {
     if (browserInstance) {
         try {
@@ -79,25 +76,22 @@ async function initializeBrowser() {
     console.log('🚀 Starting browser...');
     
     try {
-        // LIGHTWEIGHT PUPPETEER CONFIGURATION FOR RAILWAY
         const browser = await puppeteer.launch({
             headless: 'new',
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--single-process',
-                '--no-zygote'
+                '--single-process'
             ],
             timeout: 30000
         });
 
         const page = await browser.newPage();
-        
         await page.setDefaultNavigationTimeout(30000);
         await page.setDefaultTimeout(15000);
 
-        console.log('📝 Going directly to login page...');
+        console.log('📝 Going to login page...');
         await page.goto('https://sellin.oway-ke.com/user/login', { 
             waitUntil: 'domcontentloaded',
             timeout: 30000
@@ -105,14 +99,11 @@ async function initializeBrowser() {
 
         await page.waitForTimeout(2000);
 
-        console.log('🔐 Attempting login...');
+        console.log('🔐 Logging in...');
         await page.type('input[type="text"], input[name="username"]', LOGIN_CREDENTIALS.username, { delay: 50 });
         await page.type('input[type="password"], input[name="password"]', LOGIN_CREDENTIALS.password, { delay: 50 });
-
-        console.log('👆 Clicking login button...');
         await page.click('button[type="submit"], input[type="submit"]');
 
-        console.log('⏳ Waiting for login...');
         await page.waitForTimeout(3000);
 
         console.log('🎯 Navigating to IMEI tool...');
@@ -121,33 +112,13 @@ async function initializeBrowser() {
             timeout: 30000
         });
 
-        const currentUrl = page.url();
-        console.log('📍 Current URL:', currentUrl);
-
-        if (currentUrl.includes('tool/imei')) {
-            console.log('✅ Successfully reached IMEI tool page!');
-        } else if (currentUrl.includes('login')) {
-            throw new Error('Login failed - still on login page');
-        } else {
-            console.log('⚠️ On different page, trying to navigate to IMEI tool again...');
-            try {
-                await page.goto('https://sellin.oway-ke.com/tool/imei', {
-                    waitUntil: 'domcontentloaded',
-                    timeout: 15000
-                });
-            } catch (navError) {
-                console.log('❌ Could not navigate to IMEI tool directly');
-                throw navError;
-            }
-        }
-
         await page.waitForTimeout(2000);
         
         try {
             await page.waitForSelector('textarea', { timeout: 5000 });
-            console.log('✅ IMEI tool is ready for use!');
+            console.log('✅ IMEI tool ready!');
         } catch (error) {
-            console.log('❌ IMEI tool not loading properly');
+            console.log('❌ IMEI tool not loading');
             throw new Error('IMEI tool page not loading correctly');
         }
 
@@ -166,10 +137,9 @@ async function initializeBrowser() {
     }
 }
 
-// Process a single chunk of IMEIs (max 50)
+// Process IMEI chunk
 async function processIMEIChunk(imeiChunk, page) {
     try {
-        // Ensure we're on the IMEI tool page
         const currentUrl = page.url();
         if (!currentUrl.includes('tool/imei')) {
             await page.goto('https://sellin.oway-ke.com/tool/imei', {
@@ -179,7 +149,6 @@ async function processIMEIChunk(imeiChunk, page) {
             await page.waitForTimeout(1000);
         }
 
-        // Clear textarea
         await page.waitForSelector('textarea', { timeout: 5000 });
         await page.evaluate(() => {
             const textarea = document.querySelector('textarea');
@@ -189,16 +158,14 @@ async function processIMEIChunk(imeiChunk, page) {
             }
         });
 
-        // Type IMEIs for this chunk
         const bulkImeiText = imeiChunk.join('\n');
         await page.type('textarea', bulkImeiText, { delay: 10 });
 
-        // Click check button
         const buttonClicked = await page.evaluate(() => {
             const buttons = document.querySelectorAll('button, input[type="submit"]');
             for (let button of buttons) {
                 const buttonText = button.textContent || button.value || '';
-                if (buttonText.includes('Check') || buttonText.includes('Search') || buttonText.includes('Get Info') || button.type === 'submit') {
+                if (buttonText.includes('Check') || buttonText.includes('Search') || button.type === 'submit') {
                     button.click();
                     return true;
                 }
@@ -210,17 +177,14 @@ async function processIMEIChunk(imeiChunk, page) {
             await page.keyboard.press('Enter');
         }
 
-        // Wait for results
         await page.waitForTimeout(5000);
 
-        // PARSING LOGIC WITH SUB-CATEGORIES
         const results = await page.evaluate((imeis) => {
             const results = [];
             const rows = document.querySelectorAll('tr');
             
             imeis.forEach(imei => {
                 let found = false;
-                let isActuallyNotExist = false;
                 
                 for (let row of rows) {
                     const cells = Array.from(row.querySelectorAll('td, th')).map(cell => 
@@ -229,25 +193,16 @@ async function processIMEIChunk(imeiChunk, page) {
                     
                     if (cells.some(cell => cell.includes(imei))) {
                         found = true;
-                        
                         const model = cells[3] || '-';
                         const color = cells[4] || '-';
                         const inDate = cells[5] || '-';
                         const outDate = cells[6] || '-';
                         const activationDate = cells[7] || '-';
 
-                        // CHECK IF THE IMEI ACTUALLY DOESN'T EXIST
-                        if (model.toLowerCase().includes('not exist') || 
-                            model === '-' || 
-                            model === 'not exists' ||
-                            (inDate === '-' && outDate === '-' && activationDate === '-')) {
-                            isActuallyNotExist = true;
-                        }
-
                         let status, output, category;
                         let daysActive = '-';
                         
-                        if (isActuallyNotExist) {
+                        if (model.toLowerCase().includes('not exist') || model === '-' || (inDate === '-' && outDate === '-' && activationDate === '-')) {
                             status = 'NOT EXIST';
                             category = 'not-exist';
                             output = `${imei} - not exists`;
@@ -256,13 +211,11 @@ async function processIMEIChunk(imeiChunk, page) {
                             category = 'not-active';
                             output = `${imei} - ${model} ${color} ${inDate} n/a n/a`;
                         } else {
-                            // This is an active device - calculate days active and categorize
                             try {
                                 const activationTime = new Date(activationDate);
                                 const now = new Date();
                                 daysActive = Math.floor((now - activationTime) / (1000 * 60 * 60 * 24));
                                 
-                                // SUB-CATEGORIZATION
                                 if (daysActive <= 2) {
                                     status = 'ACTIVE ≤2 DAYS';
                                     category = 'active-2-days';
@@ -279,7 +232,6 @@ async function processIMEIChunk(imeiChunk, page) {
                                 daysActive = 'error';
                             }
 
-                            // Set output based on outDate
                             if (outDate === 'n/a' || outDate === '-' || !outDate) {
                                 output = `${imei} - ${model} ${color} ${inDate} n/a ${activationDate}`;
                             } else {
@@ -291,11 +243,11 @@ async function processIMEIChunk(imeiChunk, page) {
                             imei: imei,
                             status: status,
                             output: output,
-                            model: isActuallyNotExist ? 'not exists' : model,
-                            color: isActuallyNotExist ? '-' : color,
-                            inDate: isActuallyNotExist ? '-' : inDate,
-                            outDate: isActuallyNotExist ? '-' : outDate,
-                            activationDate: isActuallyNotExist ? '-' : activationDate,
+                            model: model,
+                            color: color,
+                            inDate: inDate,
+                            outDate: outDate,
+                            activationDate: activationDate,
                             daysActive: daysActive,
                             category: category
                         });
@@ -330,37 +282,31 @@ async function processIMEIChunk(imeiChunk, page) {
     }
 }
 
-// Process IMEIs in batches of 50 to avoid website limits
+// Process IMEIs in batches
 async function checkBulkIMEIs(imeiList, page) {
     console.log(`🔍 Checking ${imeiList.length} IMEIs...`);
     
-    // Split into chunks of 50
     const chunkSize = 50;
     const chunks = [];
     for (let i = 0; i < imeiList.length; i += chunkSize) {
         chunks.push(imeiList.slice(i, i + chunkSize));
     }
 
-    console.log(`📦 Split into ${chunks.length} chunks of max ${chunkSize} IMEIs each`);
-
     const allResults = [];
 
     for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
-        console.log(`🔄 Processing chunk ${i + 1}/${chunks.length} (${chunk.length} IMEIs)...`);
+        console.log(`🔄 Processing chunk ${i + 1}/${chunks.length}...`);
 
         try {
             const chunkResults = await processIMEIChunk(chunk, page);
             allResults.push(...chunkResults);
             
-            // Small delay between chunks to avoid overwhelming the website
             if (i < chunks.length - 1) {
-                console.log('⏳ Waiting before next chunk...');
                 await page.waitForTimeout(1000);
             }
         } catch (error) {
             console.error(`❌ Error processing chunk ${i + 1}:`, error.message);
-            // Add error results for this chunk
             const errorResults = chunk.map(imei => ({
                 imei: imei,
                 status: 'ERROR',
@@ -377,7 +323,7 @@ async function checkBulkIMEIs(imeiList, page) {
         }
     }
 
-    console.log(`✅ Successfully processed all ${allResults.length} IMEIs across ${chunks.length} chunks`);
+    console.log(`✅ Processed ${allResults.length} IMEIs`);
     return allResults;
 }
 
@@ -389,7 +335,6 @@ app.post('/api/check-imei', async (req, res) => {
         return res.status(400).json({ error: 'IMEI is required' });
     }
 
-    // Use the cleaning function for single IMEI too
     const cleanedResults = cleanAndValidateIMEIs([imei]);
     
     if (cleanedResults.wrongFormat.length > 0) {
@@ -397,13 +342,7 @@ app.post('/api/check-imei', async (req, res) => {
             imei: imei,
             status: 'WRONG FORMAT',
             output: `${imei} - wrong format`,
-            category: 'wrong-format',
-            model: '-',
-            color: '-',
-            inDate: '-',
-            outDate: '-',
-            activationDate: '-',
-            daysActive: '-'
+            category: 'wrong-format'
         });
     }
 
@@ -416,7 +355,6 @@ app.post('/api/check-imei', async (req, res) => {
         console.error(`❌ Error: ${error.message}`);
         res.status(500).json({ 
             error: `Check failed: ${error.message}`,
-            imei: imei,
             success: false
         });
     }
@@ -430,90 +368,42 @@ app.post('/api/check-batch-imei', async (req, res) => {
         return res.status(400).json({ error: 'IMEI array is required' });
     }
 
-    // Use the new cleaning function
     const cleanedResults = cleanAndValidateIMEIs(imeis);
     const validImeis = cleanedResults.valid;
-    const wrongFormatImeis = cleanedResults.wrongFormat;
-    const duplicateImeis = cleanedResults.duplicates;
 
-    if (validImeis.length === 0 && wrongFormatImeis.length === 0) {
+    if (validImeis.length === 0) {
         return res.status(400).json({ error: 'No valid IMEI numbers provided' });
     }
 
-    console.log(`🔄 Starting batch check of ${validImeis.length} IMEIs (will process in chunks of 50)...`);
-
     const startTime = Date.now();
 
-    let browser;
-    let page;
-    let checkResults = [];
-
     try {
-        if (validImeis.length > 0) {
-            browser = await initializeBrowser();
-            page = (await browser.pages())[0];
-            checkResults = await checkBulkIMEIs(validImeis, page);
-        }
+        const browser = await initializeBrowser();
+        const page = (await browser.pages())[0];
+        const checkResults = await checkBulkIMEIs(validImeis, page);
 
-        const wrongFormatResults = wrongFormatImeis.map(imei => ({
-            imei: imei,
-            status: 'WRONG FORMAT',
-            output: `${imei} - wrong format`,
-            category: 'wrong-format',
-            model: '-',
-            color: '-',
-            inDate: '-',
-            outDate: '-',
-            activationDate: '-',
-            daysActive: '-'
-        }));
-
-        const duplicateResults = duplicateImeis.map(imei => ({
-            imei: imei,
-            status: 'DUPLICATE',
-            output: `${imei} - duplicate`,
-            category: 'duplicate',
-            model: '-',
-            color: '-',
-            inDate: '-',
-            outDate: '-',
-            activationDate: '-',
-            daysActive: '-'
-        }));
-
-        const allResults = [...checkResults, ...wrongFormatResults, ...duplicateResults];
         const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
         
-        console.log(`✅ Batch check completed in ${totalTime} seconds`);
-
         const summary = {
-            'not-exist': allResults.filter(r => r.category === 'not-exist').length,
-            'not-active': allResults.filter(r => r.category === 'not-active').length,
-            'active-2-days': allResults.filter(r => r.category === 'active-2-days').length,
-            'active-3-15-days': allResults.filter(r => r.category === 'active-3-15-days').length,
-            'active-more-15': allResults.filter(r => r.category === 'active-more-15').length,
-            'error': allResults.filter(r => r.category === 'error').length,
-            'wrong-format': wrongFormatImeis.length,
-            'duplicate': duplicateImeis.length
+            'not-exist': checkResults.filter(r => r.category === 'not-exist').length,
+            'not-active': checkResults.filter(r => r.category === 'not-active').length,
+            'active-2-days': checkResults.filter(r => r.category === 'active-2-days').length,
+            'active-3-15-days': checkResults.filter(r => r.category === 'active-3-15-days').length,
+            'active-more-15': checkResults.filter(r => r.category === 'active-more-15').length,
+            'error': checkResults.filter(r => r.category === 'error').length
         };
 
         res.json({
             success: true,
             total: imeis.length,
             valid: validImeis.length,
-            wrongFormat: wrongFormatImeis.length,
-            duplicates: duplicateImeis.length,
             summary: summary,
-            results: allResults,
+            results: checkResults,
             processingTime: `${totalTime} seconds`
         });
 
     } catch (error) {
         console.error('❌ Batch processing error:', error);
-        if (browser) {
-            await browser.close();
-            browserInstance = null;
-        }
         return res.status(500).json({ 
             error: `Batch processing failed: ${error.message}`,
             success: false
@@ -526,8 +416,7 @@ app.get('/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         message: 'IMEI Checker is running',
-        timestamp: new Date().toISOString(),
-        browserActive: !!browserInstance
+        timestamp: new Date().toISOString()
     });
 });
 
@@ -535,15 +424,11 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// RAILWAY PORT CONFIGURATION
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log('📱 IMEI Checker - Lightweight Railway Version');
-    console.log('❤️ Health: /health');
 });
 
-// Graceful shutdown
 process.on('SIGINT', async () => {
     console.log('🛑 Shutting down...');
     if (browserInstance) {
