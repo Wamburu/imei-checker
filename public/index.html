@@ -1,0 +1,13 @@
+// In your checkSingleIMEI() function, change the fetch URL to:
+const response = await fetch('/api/check-imei', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ imei })
+});
+
+// In your checkBatchIMEI() function, change the fetch URL to:
+const response = await fetch('/api/check-batch-imei', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ imeis })
+});
