@@ -1,14 +1,21 @@
 FROM node:18-alpine
 
-# Install Chromium dependencies
-RUN apk add --no-cache \
+# Install Chromium with better progress tracking
+RUN echo "🚀 Starting Chromium installation..." && \
+    apk update && \
+    apk add --no-cache \
     chromium \
     nss \
     freetype \
     freetype-dev \
     harfbuzz \
     ca-certificates \
-    ttf-freefont
+    ttf-freefont && \
+    echo "✅ Chromium installed successfully!"
+
+# Verify installation
+RUN chromium-browser --version && \
+    echo "🎯 Chromium version confirmed"
 
 # Set Puppeteer to use system Chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
@@ -20,8 +27,10 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install --production
+# Install Node.js dependencies
+RUN echo "📦 Installing Node.js dependencies..." && \
+    npm install --omit=dev --progress=false && \
+    echo "✅ Dependencies installed successfully!"
 
 # Copy app source
 COPY . .
