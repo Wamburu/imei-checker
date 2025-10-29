@@ -6,7 +6,4 @@ startCommand = "npm start"
 
 [build.environment]
 NODE_ENV = "production"
-
-[[build.environment]]
-name = "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD"
-value = "false"
+PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
