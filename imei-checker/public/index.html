@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IMEI Checker Tool</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #ecf0f1;
+            background: #f8f9fa;
+            border-radius: 10px 10px 0 0;
+            overflow: hidden;
+        }
+        .tab {
+            padding: 15px 30px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            flex: 1;
+            text-align: center;
+        }
+        .tab.active {
+            background: #3498db;
+            color: white;
+            box-shadow: 0 2px 10px rgba(52, 152, 219, 0.3);
+        }
+        .tab:hover:not(.active) {
+            background: #e8f4fc;
+        }
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.5s ease-in;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 15px;
+            margin: 12px 0;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+            transition: border-color 0.3s ease;
+        }
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+        textarea {
+            min-height: 200px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+        button {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 8px 5px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        button:disabled {
+            background: #bdc3c7;
+            transform: none;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+        button.secondary {
+            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+        }
+        button.success {
+            background: linear-gradient(135deg, #27ae60, #229954);
+        }
+        button.danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+        .result {
+            margin-top: 25px;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 5px solid #3498db;
+            background: #f8f9fa;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .result.not-exist {
+            border-left-color: #e74c3c;
+            background: linear-gradient(135deg, #ffeaea, #ffcccc);
+        }
+        .result.not-active {
+            border-left-color: #f39c12;
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+        }
+        .result.active-2-days {
+            border-left-color: #27ae60;
+            background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+        }
+        .result.active-3-15-days {
+            border-left-color: #2ecc71;
+            background: linear-gradient(135deg, #e8f5e8, #a5d6a7);
+        }
+        .result.active-more-15 {
+            border-left-color: #2980b9;
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+        }
+        .result.error {
+            border-left-color: #9b59b6;
+            background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .summary {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            padding: 25px;
+            border-radius: 12px;
+            margin: 25px 0;
+            border-left: 5px solid #2196F3;
+            box-shadow: 0 5px 20px rgba(33, 150, 243, 0.2);
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .summary-item {
+            text-align: center;
+            padding: 20px 15px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            font-size: 1.1em;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+        .summary-item:hover {
+            transform: translateY(-3px);
+        }
+        .summary-not-exist { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+        .summary-not-active { background: linear-gradient(135deg, #f39c12, #d35400); }
+        .summary-active-2-days { background: linear-gradient(135deg, #27ae60, #229954); }
+        .summary-active-3-15-days { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+        .summary-active-more-15 { background: linear-gradient(135deg, #2980b9, #1f618d); }
+        .summary-error { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+        .batch-results {
+            border: 2px solid #ecf0f1;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 25px;
+            background: white;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        .category-section {
+            margin: 30px 0;
+            border: 2px solid #ecf0f1;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .category-header {
+            padding: 20px;
+            color: white;
+            font-size: 1.3em;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .category-content {
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .imei-list {
+            font-family: 'Courier New', monospace;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 15px 0;
+            line-height: 1.8;
+        }
+        .copy-btn {
+            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+            padding: 8px 16px;
+            font-size: 14px;
+            margin: 5px;
+        }
+        .copy-btn:hover {
+            background: linear-gradient(135deg, #7f8c8d, #95a5a6);
+        }
+        .result-item {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+        .result-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .imei-number {
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #f39c12;
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+        }
+        .alert-info {
+            border-left-color: #3498db;
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+        }
+        .instructions {
+            background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 5px solid #27ae60;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #27ae60;
+            margin-bottom: 10px;
+        }
+        .paste-notification {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, #27ae60, #229954);
+            color: white;
+            padding: 20px 25px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(39, 174, 96, 0.4);
+            z-index: 1000;
+            display: none;
+            animation: slideIn 0.5s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .debug-info {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            display: none;
+        }
+        .hidden-textarea {
+            position: absolute;
+            left: -9999px;
+            opacity: 0;
+            height: 0;
+            width: 0;
+        }
+        .imei-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        .imei-table th {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .imei-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        .imei-table tr:hover {
+            background: #f8f9fa;
+        }
+        .imei-table tr:last-child td {
+            border-bottom: none;
+        }
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .status-not-exist { background: #e74c3c; color: white; }
+        .status-not-active { background: #f39c12; color: white; }
+        .status-active-2-days { background: #27ae60; color: white; }
+        .status-active-3-15-days { background: #2ecc71; color: white; }
+        .status-active-more-15 { background: #3498db; color: white; }
+        .status-error { background: #9b59b6; color: white; }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 20px 15px;
+            }
+            h1 {
+                font-size: 2em;
+            }
+            .tabs {
+                flex-direction: column;
+            }
+            .tab {
+                padding: 12px 20px;
+            }
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+            .imei-table {
+                font-size: 14px;
+            }
+            .imei-table th,
+            .imei-table td {
+                padding: 8px 10px;
+            }
+            .category-header {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="paste-notification" id="paste-notification">
+        Multiple IMEIs detected! Switched to Batch Check tab.
+    </div>
+
+    <textarea class="hidden-textarea" id="hidden-paste-area"></textarea>
+
+    <div class="container">
+        <h1>📱 IMEI Checker Tool</h1>
+        <p class="subtitle">Check detailed IMEI information with comprehensive categorization</p>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('single')">Single IMEI</button>
+            <button class="tab" onclick="switchTab('batch')">Batch Check</button>
+        </div>
+
+        <!-- Single IMEI Tab -->
+        <div id="single-tab" class="tab-content active">
+            <div class="instructions">
+                <h3>💡 Single IMEI Check</h3>
+                <p>Enter <strong>ONE IMEI number only</strong> (15 digits) to get detailed device information</p>
+            </div>
+            
+            <div>
+                <label><strong>Enter IMEI Number (15 digits):</strong></label>
+                <input type="text" id="single-imei" placeholder="Enter 15-digit IMEI number..." maxlength="15">
+                <br>
+                <button onclick="checkSingleIMEI()" id="single-check-btn">Check This IMEI</button>
+                <button onclick="clearSingleResults()" class="secondary">Clear</button>
+            </div>
+            
+            <div id="single-results"></div>
+        </div>
+
+        <!-- Batch IMEI Tab -->
+        <div id="batch-tab" class="tab-content">
+            <div class="instructions">
+                <h3>📊 Batch IMEI Check</h3>
+                <p>Enter <strong>multiple IMEI numbers</strong> - one per line to get comprehensive device information</p>
+            </div>
+            
+            <div>
+                <label><strong>Enter IMEI Numbers (one per line):</strong></label>
+                <textarea id="batch-imeis" placeholder="Example:&#10;866634080231011&#10;866634080231012&#10;866634080231013&#10;866634080231014"></textarea>
+                
+                <div class="alert alert-info">
+                    <strong>📋 Pro Tip:</strong> You can copy-paste directly from Excel, text files, or any IMEI list
+                </div>
+                
+                <div>
+                    <button onclick="checkBatchIMEI()" id="batch-check-btn">Check All IMEIs</button>
+                    <button onclick="clearBatch()" class="secondary">Clear List</button>
+                    <button onclick="addSampleData()" class="secondary">Add Sample IMEIs</button>
+                    <button onclick="formatIMEIList()" class="secondary">Format List</button>
+                </div>
+            </div>
+            
+            <div id="batch-info" style="display: none; margin: 15px 0;">
+                <strong>📊 Ready to check: <span id="imei-count">0</span> IMEIs</strong>
+                <br>
+                <small>Estimated time: ~<span id="estimated-time">0</span> minutes</small>
+            </div>
+            
+            <div id="batch-summary" class="summary" style="display: none;"></div>
+            <div id="batch-results" class="batch-results"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentBatchResults = [];
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+            
+            if (tabName === 'batch') {
+                updateIMEICount();
+            }
+        }
+
+        // Paste detection setup
+        document.getElementById('single-imei').addEventListener('focus', function() {
+            document.getElementById('hidden-paste-area').focus();
+        });
+
+        document.getElementById('hidden-paste-area').addEventListener('paste', function(e) {
+            const pastedData = e.clipboardData.getData('text');
+            processPastedData(pastedData);
+            e.preventDefault();
+        });
+
+        document.getElementById('single-imei').addEventListener('paste', function(e) {
+            setTimeout(() => {
+                processPastedData(this.value);
+            }, 10);
+        });
+
+        function extractIMEIs(text) {
+            let cleaned = text.replace(/[^\d\s\n]/g, '');
+            const separators = ['\n', ' ', '\t', ',', ';', '|'];
+            let potentialIMEIs = [cleaned];
+            
+            separators.forEach(separator => {
+                const split = cleaned.split(separator);
+                if (split.length > 1) potentialIMEIs = split;
+            });
+            
+            const validIMEIs = potentialIMEIs
+                .map(imei => imei.trim())
+                .filter(imei => imei.length === 15 && /^\d+$/.test(imei))
+                .filter((imei, index, self) => self.indexOf(imei) === index);
+            
+            return validIMEIs;
+        }
+
+        function processPastedData(pastedData) {
+            const extractedIMEIs = extractIMEIs(pastedData);
+            
+            if (extractedIMEIs.length > 1) {
+                const notification = document.getElementById('paste-notification');
+                notification.textContent = `Detected ${extractedIMEIs.length} IMEIs! Switched to Batch Check.`;
+                notification.style.display = 'block';
+                
+                switchTab('batch');
+                document.getElementById('batch-imeis').value = extractedIMEIs.join('\n');
+                updateIMEICount();
+                document.getElementById('single-imei').value = '';
+                
+                setTimeout(() => notification.style.display = 'none', 4000);
+            } else if (extractedIMEIs.length === 1) {
+                document.getElementById('single-imei').value = extractedIMEIs[0];
+            }
+        }
+
+        function updateIMEICount() {
+            const imeisText = document.getElementById('batch-imeis').value.trim();
+            const imeis = extractIMEIs(imeisText);
+            const imeiCount = imeis.length;
+            const estimatedMinutes = Math.ceil(imeiCount * 10 / 60);
+            
+            document.getElementById('imei-count').textContent = imeiCount;
+            document.getElementById('estimated-time').textContent = estimatedMinutes;
+            
+            document.getElementById('batch-info').style.display = imeiCount > 0 ? 'block' : 'none';
+        }
+
+        function formatIMEIList() {
+            const textarea = document.getElementById('batch-imeis');
+            const extractedIMEIs = extractIMEIs(textarea.value);
+            textarea.value = extractedIMEIs.join('\n');
+            updateIMEICount();
+            
+            if (extractedIMEIs.length > 0) {
+                alert(`Formatted list: ${extractedIMEIs.length} valid IMEI(s) found.`);
+            } else {
+                alert('No valid 15-digit IMEIs found.');
+            }
+        }
+
+        document.getElementById('batch-imeis').addEventListener('input', updateIMEICount);
+
+        async function checkSingleIMEI() {
+            const imei = document.getElementById('single-imei').value.trim();
+            const button = document.getElementById('single-check-btn');
+            const resultsDiv = document.getElementById('single-results');
+
+            if (!imei) {
+                alert('Please enter an IMEI number');
+                return;
+            }
+
+            if (imei.length !== 15 || !/^\d+$/.test(imei)) {
+                alert('IMEI must be exactly 15 digits (numbers only)');
+                return;
+            }
+
+            button.disabled = true;
+            button.textContent = 'Checking...';
+            
+            resultsDiv.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Checking IMEI: ${imei}<br>
+                    Getting detailed device information...<br>
+                    <small>Please wait 10-15 seconds</small>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/check-imei', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ imei })
+                });
+
+                const result = await response.json();
+                displaySingleResult(result);
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="result error">❌ Connection failed: ${error.message}</div>`;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Check This IMEI';
+            }
+        }
+
+        function displaySingleResult(result) {
+            const resultsDiv = document.getElementById('single-results');
+            
+            if (result.success !== false) {
+                const statusClass = result.category || 'error';
+                const statusText = getStatusText(result.category);
+                
+                resultsDiv.innerHTML = `
+                    <div class="result ${statusClass}">
+                        <h3>📱 Device Information</h3>
+                        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                            <tr><td style="padding: 8px 0; font-weight: bold; width: 150px;">IMEI:</td><td>${result.imei}</td></tr>
+                            <tr><td style="padding: 8px 0; font-weight: bold;">Status:</td><td><span class="status-badge status-${statusClass}">${statusText}</span></td></tr>
+                            <tr><td style="padding: 8px 0; font-weight: bold;">Model:</td><td>${result.model || '-'}</td></tr>
+                            <tr><td style="padding: 8px 0; font-weight: bold;">Color:</td><td>${result.color || '-'}</td></tr>
+                            <tr><td style="padding: 8px 0; font-weight: bold;">Storage:</td><td>${result.storage || '-'}</td></tr>
+                            <tr><td style="padding: 8px 0; font-weight: bold;">In Date:</td><td>${result.inDate || '-'}</td></tr>
+                            <tr><td style="padding: 8px 0; font-weight: bold;">Out Date:</td><td>${result.outDate || '-'}</td></tr>
+                            <tr><td style="padding: 8px 0; font-weight: bold;">Activation:</td><td>${result.activationDate || '-'}</td></tr>
+                            <tr><td style="padding: 8px 0; font-weight: bold;">Days Active:</td><td>${result.daysActive || '-'}</td></tr>
+                            <tr><td style="padding: 8px 0; font-weight: bold;">Message:</td><td>${result.output || result.message}</td></tr>
+                        </table>
+                    </div>
+                `;
+            } else {
+                resultsDiv.innerHTML = `<div class="result error"><strong>Error:</strong> ${result.error || 'Check failed'}</div>`;
+            }
+        }
+
+        async function checkBatchIMEI() {
+            const imeisText = document.getElementById('batch-imeis').value.trim();
+            const button = document.getElementById('batch-check-btn');
+            const resultsDiv = document.getElementById('batch-results');
+            const summaryDiv = document.getElementById('batch-summary');
+
+            if (!imeisText) {
+                alert('Please enter at least one IMEI number');
+                return;
+            }
+
+            const imeis = extractIMEIs(imeisText);
+            if (imeis.length === 0) {
+                alert('Please enter at least one valid IMEI number');
+                return;
+            }
+
+            button.disabled = true;
+            button.textContent = 'Checking...';
+            
+            const estimatedTime = Math.ceil(imeis.length * 10 / 60);
+            resultsDiv.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Checking ${imeis.length} IMEIs...<br>
+                    Getting comprehensive device information...<br>
+                    <small>Estimated time: ~${estimatedTime} minutes</small><br>
+                    <small>Do not close this window</small>
+                </div>
+            `;
+            summaryDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/check-batch-imei', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ imeis })
+                });
+
+                const result = await response.json();
+                
+                // Debug logging
+                console.log('Batch API Response:', result);
+                
+                if (result.success) {
+                    currentBatchResults = result.results;
+                    displayBatchResults(result);
+                } else {
+                    resultsDiv.innerHTML = `<div class="result error">❌ Batch check failed: ${result.error}</div>`;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="result error">❌ Connection failed: ${error.message}</div>`;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Check All IMEIs';
+            }
+        }
+
+        function displayBatchResults(result) {
+            const resultsDiv = document.getElementById('batch-results');
+            const summaryDiv = document.getElementById('batch-summary');
+
+            // Add defensive checks
+            if (!result || !result.summary) {
+                console.error('Invalid result format:', result);
+                resultsDiv.innerHTML = `<div class="result error">❌ Invalid response format from server</div>`;
+                return;
+            }
+
+            const summary = result.summary || {};
+            const organizedResults = organizeResults(result.results || []);
+            
+            // Display summary
+            summaryDiv.innerHTML = `
+                <h3>📊 Batch Check Summary</h3>
+                <p>Processed ${result.total || 0} IMEIs in ${result.processingTime || '0 seconds'}</p>
+                <div class="summary-grid">
+                    <div class="summary-item summary-not-exist">Not Exist: ${summary['not-exist'] || 0}</div>
+                    <div class="summary-item summary-not-active">Not Active: ${summary['not-active'] || 0}</div>
+                    <div class="summary-item summary-active-2-days">Active ≤2d: ${summary['active-2-days'] || 0}</div>
+                    <div class="summary-item summary-active-3-15-days">Active 3-15d: ${summary['active-3-15-days'] || 0}</div>
+                    <div class="summary-item summary-active-more-15">Expired >15d: ${summary['active-more-15'] || 0}</div>
+                    <div class="summary-item summary-error">Errors: ${summary['error'] || 0}</div>
+                </div>
+            `;
+            summaryDiv.style.display = 'block';
+
+            // Display organized results by category
+            let resultsHTML = `<h3>📋 Organized Results</h3>`;
+            
+            // Display each category in its own section
+            const categories = [
+                { key: 'active-2-days', name: '🟢 Active ≤2 Days', color: '#27ae60' },
+                { key: 'active-3-15-days', name: '🟡 Active 3-15 Days', color: '#f39c12' },
+                { key: 'active-more-15', name: '🔴 Expired >15 Days', color: '#e74c3c' },
+                { key: 'not-active', name: '⚫ Not Active', color: '#2c3e50' },
+                { key: 'not-exist', name: '❌ Not Exist', color: '#7f8c8d' },
+                { key: 'error', name: '⚠️ Errors', color: '#9b59b6' }
+            ];
+
+            categories.forEach(category => {
+                const items = organizedResults[category.key] || [];
+                if (items.length > 0) {
+                    const imeiList = items.map(item => item.imei).join('\n');
+                    resultsHTML += `
+                        <div class="category-section">
+                            <div class="category-header" style="background: ${category.color}">
+                                <span>${category.name} (${items.length})</span>
+                                <button class="copy-btn" onclick="copyToClipboard('${category.key}-imeis')">
+                                    📋 Copy All ${items.length} IMEIs
+                                </button>
+                            </div>
+                            <div class="category-content">
+                                <textarea id="${category.key}-imeis" class="imei-list" readonly>${imeiList}</textarea>
+                                <div style="margin-top: 15px;">
+                                    <table class="imei-table">
+                                        <thead>
+                                            <tr>
+                                                <th>IMEI</th>
+                                                <th>Status</th>
+                                                <th>Model</th>
+                                                <th>Days Active</th>
+                                                <th>Activation Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${items.map(item => `
+                                                <tr>
+                                                    <td><strong>${item.imei}</strong></td>
+                                                    <td><span class="status-badge status-${item.category}">${getStatusText(item.category)}</span></td>
+                                                    <td>${item.model || '-'}</td>
+                                                    <td>${item.daysActive || '-'}</td>
+                                                    <td>${item.activationDate || '-'}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            if (result.results && result.results.length === 0) {
+                resultsHTML += `<div class="result error">No results returned from server</div>`;
+            }
+
+            resultsDiv.innerHTML = resultsHTML;
+        }
+
+        function organizeResults(results) {
+            return {
+                'not-exist': results.filter(r => r.category === 'not-exist'),
+                'not-active': results.filter(r => r.category === 'not-active'),
+                'active-2-days': results.filter(r => r.category === 'active-2-days'),
+                'active-3-15-days': results.filter(r => r.category === 'active-3-15-days'),
+                'active-more-15': results.filter(r => r.category === 'active-more-15'),
+                'error': results.filter(r => r.category === 'error')
+            };
+        }
+
+        function getStatusText(category) {
+            const statusMap = {
+                'not-exist': 'Not Exist',
+                'not-active': 'Not Active',
+                'active-2-days': 'Active ≤2d',
+                'active-3-15-days': 'Active 3-15d',
+                'active-more-15': 'Expired >15d',
+                'error': 'Error',
+                'wrong-format': 'Wrong Format',
+                'duplicate': 'Duplicate'
+            };
+            return statusMap[category] || 'Unknown';
+        }
+
+        function copyToClipboard(elementId) {
+            const textarea = document.getElementById(elementId);
+            textarea.select();
+            textarea.setSelectionRange(0, 99999); // For mobile devices
+            document.execCommand('copy');
+            
+            // Show temporary notification
+            const notification = document.getElementById('paste-notification');
+            notification.textContent = '✅ IMEIs copied to clipboard!';
+            notification.style.display = 'block';
+            notification.style.background = 'linear-gradient(135deg, #27ae60, #229954)';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 2000);
+        }
+
+        function clearSingleResults() {
+            document.getElementById('single-results').innerHTML = '';
+            document.getElementById('single-imei').value = '';
+        }
+
+        function clearBatch() {
+            document.getElementById('batch-imeis').value = '';
+            document.getElementById('batch-results').innerHTML = '';
+            document.getElementById('batch-summary').style.display = 'none';
+            document.getElementById('batch-info').style.display = 'none';
+            currentBatchResults = [];
+        }
+
+        function addSampleData() {
+            const sampleIMEIs = [
+                '866634080231011',
+                '866634080231012', 
+                '866634080231013',
+                '866634080231014',
+                '866634080231015'
+            ];
+            document.getElementById('batch-imeis').value = sampleIMEIs.join('\n');
+            updateIMEICount();
+        }
+
+        document.getElementById('single-imei').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') checkSingleIMEI();
+        });
+
+        // Initialize
+        updateIMEICount();
+        console.log('🚀 Enhanced IMEI Checker loaded!');
+    </script>
+</body>
+</html>
