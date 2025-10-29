@@ -5,7 +5,7 @@
     "dev": "vercel dev"
   },
   "dependencies": {
-    "puppeteer": "^21.5.2",
+    "puppeteer-core": "^21.11.0",
     "chrome-aws-lambda": "^10.1.0"
   }
 }
