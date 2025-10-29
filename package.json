@@ -5,7 +5,10 @@
     "dev": "vercel dev"
   },
   "dependencies": {
-    "puppeteer-core": "^21.11.0",
-    "chrome-aws-lambda": "^10.1.0"
+    "puppeteer-core": "10.1.0",
+    "chrome-aws-lambda": "10.1.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
